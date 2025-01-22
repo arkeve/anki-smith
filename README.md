@@ -1,6 +1,6 @@
 # Anki Card Generator
 
-A web application that generates Anki cards from text passages using OpenAI's API and integrates with Anki through AnkiConnect.
+A tool designed to streamline the creation of Anki flashcards using the power of Large Language Models. This web application allows you to effortlessly generate high-quality flashcards from text passages and seamlessly upload them to your Anki account. By leveraging OpenAI's structured outputs, it intelligently suggests appropriate decks and tags based on your existing Anki configuration. Before finalizing, you can review and edit the generated cards to ensure they perfectly match your learning needs.
 
 ## Setup
 
