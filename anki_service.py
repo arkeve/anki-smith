@@ -67,12 +67,13 @@ def get_all_tags():
     response = invoke("getTags")
     return response.get("result", [])
 
-def generate_anki_cards(text_passage):
+def generate_anki_cards(text_passage, card_count=3):
     """Generate Anki cards from a text passage using OpenAI's API."""
     # Get available tags and decks to inform the model
     available_tags = get_all_tags()
     available_decks = get_all_decks()
-    system_message = f"""Extract up to 3 Anki cards from the provided text.
+
+    system_message = f"""Extract up to {card_count} Anki cards from the provided text.
 Available decks: {', '.join(available_decks)}
 Available tags: {', '.join(available_tags)}
 Please use appropriate tags from the available list for each card and select an appropriate deck from the available decks."""

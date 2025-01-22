@@ -16,6 +16,11 @@
         <div class="bg-white rounded-lg shadow-md p-6 mb-8">
             <textarea id="textInput" class="w-full h-32 p-4 border rounded-lg mb-4" 
                       placeholder="Enter your text passage here..."></textarea>
+            <div class="flex items-center space-x-4 mb-4">
+                <label for="cardCount" class="text-gray-700">Number of cards:</label>
+                <input type="range" id="cardCount" min="1" max="10" value="3" class="w-32">
+                <span id="cardCountDisplay" class="text-gray-700">3</span>
+            </div>
             <div class="flex items-center space-x-4">
                 <button id="generateButton" onclick="generateCards()" 
                         class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
@@ -69,6 +74,11 @@
         let deckName = '';
         let existingTags = [];
         let existingDecks = [];
+
+        // Add slider event listener
+        document.getElementById('cardCount').addEventListener('input', function() {
+            document.getElementById('cardCountDisplay').textContent = this.value;
+        });
 
         async function loadTags() {
             try {
@@ -134,6 +144,8 @@
 
         async function generateCards() {
             const text = document.getElementById('textInput').value;
+            const cardCount = parseInt(document.getElementById('cardCount').value);
+            
             if (!text.trim()) {
                 showNotification('generateNotification', 'Please enter some text first', 'error');
                 return;
@@ -147,7 +159,10 @@
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ text })
+                    body: JSON.stringify({ 
+                        text,
+                        card_count: cardCount
+                    })
                 });
 
                 const data = await response.json();

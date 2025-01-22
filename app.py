@@ -10,8 +10,9 @@ def index():
 @app.route('/generate', methods=['POST'])
 def generate():
     text_passage = request.json.get('text')
+    card_count = request.json.get('card_count', 3)  # Default to 3 if not specified
     try:
-        structured_output = generate_anki_cards(text_passage)
+        structured_output = generate_anki_cards(text_passage, card_count)
         cards = [{"front": card.front, "back": card.back, "tags": card.tags} for card in structured_output.cards]
         return jsonify({
             "success": True,
