@@ -32,7 +32,7 @@ def create_deck(deck_name):
     """Create a new deck."""
     invoke("createDeck", {"deck": deck_name})
 
-def add_note(deck_name, front, back):
+def add_note(deck_name, front, back, tags=None):
     """Add a note (card) to a specific deck."""
     note = {
         "deckName": deck_name,
@@ -41,48 +41,46 @@ def add_note(deck_name, front, back):
             "Front": front,
             "Back": back
         },
-        "tags": [],
+        "tags": tags or [],
         "options": {
             "allowDuplicate": False
         }
     }
     invoke("addNote", {"note": note})
 
+def get_all_decks():
+    """Get all existing decks from Anki."""
+    response = invoke("deckNames")
+    return response.get("result", [])
+
 class AnkiCard(BaseModel):
     front: str
     back: str
-
-    class Config:
-        schema_extra = {
-            "example": {
-                "front": "What is matrix multiplication?",
-                "back": "Matrix multiplication is an operation that combines two matrices to create a new matrix."
-            }
-        }
+    tags: List[str]
 
 class AnkiDeck(BaseModel):
-    deck: Literal["Probability", "Linear Algebra", "C++"]
+    deck: str
     cards: List[AnkiCard]
 
-    class Config:
-        schema_extra = {
-            "example": {
-                "deck": "Linear Algebra",
-                "cards": [
-                    {
-                        "front": "What is matrix multiplication?",
-                        "back": "Matrix multiplication is an operation that combines two matrices to create a new matrix."
-                    }
-                ]
-            }
-        }
+def get_all_tags():
+    """Get all existing tags from Anki."""
+    response = invoke("getTags")
+    return response.get("result", [])
 
 def generate_anki_cards(text_passage):
     """Generate Anki cards from a text passage using OpenAI's API."""
+    # Get available tags and decks to inform the model
+    available_tags = get_all_tags()
+    available_decks = get_all_decks()
+    system_message = f"""Extract up to 3 Anki cards from the provided text.
+Available decks: {', '.join(available_decks)}
+Available tags: {', '.join(available_tags)}
+Please use appropriate tags from the available list for each card and select an appropriate deck from the available decks."""
+
     response = client.beta.chat.completions.parse(
         model="gpt-4o",  # or your specific model version
         messages=[
-            {"role": "system", "content": "Extract up to 3 Anki cards from the provided text."},
+            {"role": "system", "content": system_message},
             {"role": "user", "content": text_passage}
         ],
         response_format=AnkiDeck,

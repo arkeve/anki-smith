@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Anki Card Generator</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen p-8">
     <div class="max-w-3xl mx-auto">
@@ -36,8 +38,9 @@
         <div id="cardsContainer" class="space-y-4 hidden">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-2xl font-semibold text-gray-800">Generated Cards</h2>
-                <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
-                    Deck: <span id="deckNameDisplay" class="font-semibold"></span>
+                <div class="flex items-center space-x-4">
+                    <select id="deckSelect" class="border rounded-lg px-4 py-2 bg-white text-gray-800">
+                    </select>
                 </div>
             </div>
             <div id="cardsList" class="space-y-4"></div>
@@ -64,6 +67,36 @@
     <script>
         let generatedCards = [];
         let deckName = '';
+        let existingTags = [];
+        let existingDecks = [];
+
+        async function loadTags() {
+            try {
+                const response = await fetch('/tags');
+                const data = await response.json();
+                if (data.success) {
+                    existingTags = data.tags;
+                }
+            } catch (error) {
+                console.error('Error loading tags:', error);
+            }
+        }
+
+        async function loadDecks() {
+            try {
+                const response = await fetch('/decks');
+                const data = await response.json();
+                if (data.success) {
+                    existingDecks = data.decks;
+                }
+            } catch (error) {
+                console.error('Error loading decks:', error);
+            }
+        }
+
+        // Load tags and decks when page loads
+        loadTags();
+        loadDecks();
 
         function setLoading(buttonId, spinnerId, isLoading) {
             const button = document.getElementById(buttonId);
@@ -135,10 +168,32 @@
         function displayCards() {
             const container = document.getElementById('cardsContainer');
             const cardsList = document.getElementById('cardsList');
-            const deckNameDisplay = document.getElementById('deckNameDisplay');
+            const deckSelect = document.getElementById('deckSelect');
             container.classList.remove('hidden');
             cardsList.innerHTML = '';
-            deckNameDisplay.textContent = deckName;
+            
+            // Populate deck select
+            deckSelect.innerHTML = existingDecks.map(deck => 
+                `<option value="${deck}" ${deck === deckName ? 'selected' : ''}>${deck}</option>`
+            ).join('');
+            
+            // Add new deck option
+            deckSelect.innerHTML += '<option value="new">+ Create New Deck</option>';
+            
+            deckSelect.onchange = function() {
+                if (this.value === 'new') {
+                    const newDeck = prompt('Enter new deck name:');
+                    if (newDeck && newDeck.trim()) {
+                        deckName = newDeck.trim();
+                        existingDecks.push(deckName);
+                        displayCards(); // Refresh display
+                    } else {
+                        this.value = deckName; // Revert to previous selection
+                    }
+                } else {
+                    deckName = this.value;
+                }
+            };
 
             generatedCards.forEach((card, index) => {
                 const cardElement = document.createElement('div');
@@ -149,7 +204,11 @@
                             <h3 class="font-semibold text-lg mb-2">Front:</h3>
                             <p class="text-gray-700 mb-4">${card.front}</p>
                             <h3 class="font-semibold text-lg mb-2">Back:</h3>
-                            <p class="text-gray-700">${card.back}</p>
+                            <p class="text-gray-700 mb-4">${card.back}</p>
+                            <div class="tags-section">
+                                <h3 class="font-semibold text-lg mb-2">Tags:</h3>
+                                <select id="tagSelect${index}" multiple placeholder="Select or create tags..."></select>
+                            </div>
                         </div>
                         <div class="ml-4">
                             <input type="checkbox" id="card${index}" checked 
@@ -158,7 +217,37 @@
                     </div>
                 `;
                 cardsList.appendChild(cardElement);
+
+                // Initialize Tom Select for this card
+                new TomSelect(`#tagSelect${index}`, {
+                    plugins: ['remove_button'],
+                    persist: false,
+                    createOnBlur: true,
+                    create: true,
+                    options: existingTags.map(tag => ({value: tag, text: tag})),
+                    items: card.tags || [],
+                    onItemAdd: function(value) {
+                        updateCardTags(index, value, true);
+                    },
+                    onItemRemove: function(value) {
+                        updateCardTags(index, value, false);
+                    }
+                });
             });
+        }
+
+        function updateCardTags(cardIndex, tag, isAdding) {
+            if (!generatedCards[cardIndex].tags) {
+                generatedCards[cardIndex].tags = [];
+            }
+            
+            if (isAdding) {
+                if (!generatedCards[cardIndex].tags.includes(tag)) {
+                    generatedCards[cardIndex].tags.push(tag);
+                }
+            } else {
+                generatedCards[cardIndex].tags = generatedCards[cardIndex].tags.filter(t => t !== tag);
+            }
         }
 
         async function saveAcceptedCards() {
@@ -171,6 +260,12 @@
                 return;
             }
 
+            const selectedDeck = document.getElementById('deckSelect').value;
+            if (!selectedDeck || selectedDeck === 'new') {
+                showNotification('saveNotification', 'Please select a valid deck!', 'error');
+                return;
+            }
+
             setLoading('saveButton', 'saveSpinner', true);
 
             try {
@@ -180,7 +275,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        deck: deckName,
+                        deck: selectedDeck,
                         cards: acceptedCards
                     })
                 });
