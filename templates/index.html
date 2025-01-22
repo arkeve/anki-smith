@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anki Card Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-3xl mx-auto">
+        <h1 class="text-3xl font-bold text-gray-800 mb-8">Anki Card Generator</h1>
+        
+        <!-- Input Form -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <textarea id="textInput" class="w-full h-32 p-4 border rounded-lg mb-4" 
+                      placeholder="Enter your text passage here..."></textarea>
+            <div class="flex items-center space-x-4">
+                <button id="generateButton" onclick="generateCards()" 
+                        class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
+                    <span>Generate Cards</span>
+                    <svg id="generateSpinner" class="animate-spin h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+                <div id="generateNotification" class="hidden items-center text-red-800 bg-red-100 px-4 py-2 rounded-lg">
+                    <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                    <span id="generateErrorText"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generated Cards -->
+        <div id="cardsContainer" class="space-y-4 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-semibold text-gray-800">Generated Cards</h2>
+                <div class="bg-blue-100 text-blue-800 px-4 py-2 rounded-lg">
+                    Deck: <span id="deckNameDisplay" class="font-semibold"></span>
+                </div>
+            </div>
+            <div id="cardsList" class="space-y-4"></div>
+            
+            <div class="flex items-center space-x-4">
+                <button id="saveButton" onclick="saveAcceptedCards()" 
+                        class="bg-green-500 text-white px-6 py-2 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2">
+                    <span>Save Accepted Cards</span>
+                    <svg id="saveSpinner" class="animate-spin h-5 w-5 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                </button>
+                <div id="saveNotification" class="hidden items-center text-green-800 bg-green-100 px-4 py-2 rounded-lg">
+                    <svg class="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <span>Cards saved successfully!</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let generatedCards = [];
+        let deckName = '';
+
+        function setLoading(buttonId, spinnerId, isLoading) {
+            const button = document.getElementById(buttonId);
+            const spinner = document.getElementById(spinnerId);
+            button.disabled = isLoading;
+            if (isLoading) {
+                spinner.classList.remove('hidden');
+            } else {
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function showNotification(elementId, message = null, type = 'success', duration = 3000) {
+            const notification = document.getElementById(elementId);
+            if (message) {
+                const textElement = notification.querySelector('span');
+                if (textElement) textElement.textContent = message;
+            }
+            
+            // Update notification style based on type
+            notification.classList.remove('text-green-800', 'bg-green-100', 'text-red-800', 'bg-red-100');
+            if (type === 'success') {
+                notification.classList.add('text-green-800', 'bg-green-100');
+            } else {
+                notification.classList.add('text-red-800', 'bg-red-100');
+            }
+            
+            notification.classList.remove('hidden');
+            notification.classList.add('flex');
+            setTimeout(() => {
+                notification.classList.remove('flex');
+                notification.classList.add('hidden');
+            }, duration);
+        }
+
+        async function generateCards() {
+            const text = document.getElementById('textInput').value;
+            if (!text.trim()) {
+                showNotification('generateNotification', 'Please enter some text first', 'error');
+                return;
+            }
+
+            setLoading('generateButton', 'generateSpinner', true);
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    generatedCards = data.cards;
+                    deckName = data.deck;
+                    displayCards();
+                } else {
+                    showNotification('generateNotification', 'Error generating cards: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('generateNotification', 'Error generating cards: ' + error.message, 'error');
+            } finally {
+                setLoading('generateButton', 'generateSpinner', false);
+            }
+        }
+
+        function displayCards() {
+            const container = document.getElementById('cardsContainer');
+            const cardsList = document.getElementById('cardsList');
+            const deckNameDisplay = document.getElementById('deckNameDisplay');
+            container.classList.remove('hidden');
+            cardsList.innerHTML = '';
+            deckNameDisplay.textContent = deckName;
+
+            generatedCards.forEach((card, index) => {
+                const cardElement = document.createElement('div');
+                cardElement.className = 'bg-white rounded-lg shadow-md p-6';
+                cardElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-lg mb-2">Front:</h3>
+                            <p class="text-gray-700 mb-4">${card.front}</p>
+                            <h3 class="font-semibold text-lg mb-2">Back:</h3>
+                            <p class="text-gray-700">${card.back}</p>
+                        </div>
+                        <div class="ml-4">
+                            <input type="checkbox" id="card${index}" checked 
+                                   class="w-5 h-5 text-blue-600 rounded focus:ring-blue-500">
+                        </div>
+                    </div>
+                `;
+                cardsList.appendChild(cardElement);
+            });
+        }
+
+        async function saveAcceptedCards() {
+            const acceptedCards = generatedCards.filter((_, index) => 
+                document.getElementById(`card${index}`).checked
+            );
+
+            if (acceptedCards.length === 0) {
+                showNotification('saveNotification', 'No cards selected!', 'error');
+                return;
+            }
+
+            setLoading('saveButton', 'saveSpinner', true);
+
+            try {
+                const response = await fetch('/save-cards', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        deck: deckName,
+                        cards: acceptedCards
+                    })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    showNotification('saveNotification', 'Cards saved successfully!', 'success');
+                    // Wait for the notification to be visible before resetting
+                    setTimeout(() => {
+                        document.getElementById('textInput').value = '';
+                        document.getElementById('cardsContainer').classList.add('hidden');
+                    }, 1000); // Wait 1 second before clearing
+                } else {
+                    showNotification('saveNotification', 'Error saving cards: ' + data.error, 'error');
+                }
+            } catch (error) {
+                showNotification('saveNotification', 'Error saving cards: ' + error.message, 'error');
+            } finally {
+                setLoading('saveButton', 'saveSpinner', false);
+            }
+        }
+    </script>
+</body>
+</html> 
