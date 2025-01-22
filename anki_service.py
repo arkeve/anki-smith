@@ -37,7 +37,7 @@ def add_note(deck_name, front, back, tags=None):
     """Add a note (card) to a specific deck."""
     note = {
         "deckName": deck_name,
-        "modelName": "KaTeX and Markdown Basic",
+        "modelName": "KaTeX and Markdown Basic (Color)",
         "fields": {
             "Front": front,
             "Back": back
