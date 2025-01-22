@@ -4,6 +4,7 @@ import requests
 from typing import Literal, List
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from enum import Enum
 
 # Load environment variables from .env file
 load_dotenv()
@@ -53,35 +54,34 @@ def get_all_decks():
     response = invoke("deckNames")
     return response.get("result", [])
 
-class AnkiCard(BaseModel):
-    front: str
-    back: str
-    tags: List[str]
-
-class AnkiDeck(BaseModel):
-    deck: str
-    cards: List[AnkiCard]
-
 def get_all_tags():
     """Get all existing tags from Anki."""
     response = invoke("getTags")
     return response.get("result", [])
 
+# Dynamically create Enum classes
+TagEnum = Enum('TagEnum', {tag.replace(" ", "_"): tag for tag in get_all_tags()})
+DeckEnum = Enum('DeckEnum', {deck.replace(" ", "_"): deck for deck in get_all_decks()})
+
+class AnkiCard(BaseModel):
+    front: str
+    back: str
+    tags: List[TagEnum]
+    class Config:
+        use_enum_values = True
+
+class AnkiDeck(BaseModel):
+    deck: DeckEnum
+    cards: List[AnkiCard]
+    class Config:
+        use_enum_values = True
+
 def generate_anki_cards(text_passage, card_count=3):
     """Generate Anki cards from a text passage using OpenAI's API."""
-    # Get available tags and decks to inform the model
-    available_tags = get_all_tags()
-    available_decks = get_all_decks()
-
-    system_message = f"""Extract up to {card_count} Anki cards from the provided text.
-Available decks: {', '.join(available_decks)}
-Available tags: {', '.join(available_tags)}
-Please use appropriate tags from the available list for each card and select an appropriate deck from the available decks."""
-
     response = client.beta.chat.completions.parse(
         model="gpt-4o",  # or your specific model version
         messages=[
-            {"role": "system", "content": system_message},
+            {"role": "system", "content": f"Extract up to {card_count} Anki cards from the provided text."},
             {"role": "user", "content": text_passage}
         ],
         response_format=AnkiDeck,
@@ -93,10 +93,10 @@ if __name__ == "__main__":
     text_passage = "linear algebra matrix multiplication"
     structured_output = generate_anki_cards(text_passage)
     
-    deck_name = structured_output.deck
+    deck_name = structured_output.deck.value  # Get the actual deck name from the enum
     create_deck(deck_name)
     
     for card in structured_output.cards:
-        add_note(deck_name, card.front, card.back)
+        add_note(deck_name, card.front, card.back, [tag.value for tag in card.tags])  # Convert enum tags to strings
     
     print("Cards added successfully!")
