@@ -76,12 +76,31 @@ class AnkiDeck(BaseModel):
     class Config:
         use_enum_values = True
 
-def generate_anki_cards(text_passage, card_count=3):
+def generate_anki_cards(text_passage, card_count=1):
     """Generate Anki cards from a text passage using OpenAI's API."""
     response = client.beta.chat.completions.parse(
         model="gpt-4o",  # or your specific model version
         messages=[
-            {"role": "system", "content": f"Extract up to {card_count} Anki cards from the provided text."},
+            {"role": "system", "content": f"""Extract up to {card_count} Anki cards from the provided text.
+
+Format your responses using:
+1. KaTeX for mathematical expressions:
+   - Use $...$ for inline math (e.g. $x^2$)
+   - Use $$...$$ for display math (e.g. $$\\begin{{matrix}} a & b \\\\ c & d \\end{{matrix}}$$)
+2. Matrix examples:
+   - Inline matrix: $\\begin{{pmatrix}} 1 & 2 \\\\ 3 & 4 \\end{{pmatrix}}$
+   - Display matrix: $$\\begin{{pmatrix}} 1 & 2 \\\\ 3 & 4 \\end{{pmatrix}}$$
+   - Matrix multiplication: If $A = \\begin{{pmatrix}} 1 & 2 \\\\ 3 & 4 \\end{{pmatrix}}$ and $B = \\begin{{pmatrix}} 5 & 6 \\\\ 7 & 8 \\end{{pmatrix}}$,
+     then $$C = A \\times B = \\begin{{pmatrix}} 19 & 22 \\\\ 43 & 50 \\end{{pmatrix}}$$
+3. Markdown for:
+   - Code blocks with language specification (e.g. ```python)
+   - Lists, tables, and other formatting
+4. Guidelines:
+   - Always wrap math expressions in $ or $$ delimiters
+   - Always wrap matrices in $ or $$ delimiters
+   - Format code snippets in appropriate language blocks
+   - Use proper markdown for lists and tables
+   - Ensure proper escaping of special characters"""},
             {"role": "user", "content": text_passage}
         ],
         response_format=AnkiDeck,

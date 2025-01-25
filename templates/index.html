@@ -14,9 +14,62 @@
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     
     <script>
+        let customMarkedRenderer;
+
         // Initialize marked.js options immediately after loading
         window.onload = function() {
+            // Create a new renderer instance
+            customMarkedRenderer = new marked.Renderer();
+            const originalParagraph = customMarkedRenderer.paragraph.bind(customMarkedRenderer);
+            
+            customMarkedRenderer.paragraph = function(text) {
+                // Ensure text is a string
+                text = String(text || '');
+                
+                try {
+                    // Temporarily replace $$ with placeholders to avoid interference
+                    let displayMathPlaceholders = [];
+                    text = text.replace(/\$\$([\s\S]+?)\$\$/g, function(match, math) {
+                        displayMathPlaceholders.push(math);
+                        return `@@DISPLAY_MATH_${displayMathPlaceholders.length - 1}@@`;
+                    });
+
+                    // Temporarily replace $ with placeholders
+                    let inlineMathPlaceholders = [];
+                    text = text.replace(/\$([^\$]+?)\$/g, function(match, math) {
+                        inlineMathPlaceholders.push(math);
+                        return `@@INLINE_MATH_${inlineMathPlaceholders.length - 1}@@`;
+                    });
+
+                    // Convert to HTML
+                    let html = originalParagraph(text);
+
+                    // Restore display math expressions
+                    displayMathPlaceholders.forEach((math, i) => {
+                        html = html.replace(
+                            `@@DISPLAY_MATH_${i}@@`,
+                            `<div class="math-display">$$${math}$$</div>`
+                        );
+                    });
+
+                    // Restore inline math expressions
+                    inlineMathPlaceholders.forEach((math, i) => {
+                        html = html.replace(
+                            `@@INLINE_MATH_${i}@@`,
+                            `<span class="math-inline">$${math}$</span>`
+                        );
+                    });
+
+                    return html;
+                } catch (error) {
+                    console.error('Error in custom renderer:', error);
+                    return originalParagraph(text);
+                }
+            };
+
+            // Set up marked options
             marked.setOptions({
+                renderer: customMarkedRenderer,
                 breaks: true,
                 gfm: true,
                 headerIds: false,
@@ -24,6 +77,17 @@
                 smartLists: true
             });
         };
+
+        // Helper function to safely parse markdown with math
+        function parseMarkdown(content) {
+            try {
+                if (!content) return '';
+                return marked.parse(String(content));
+            } catch (error) {
+                console.error('Error parsing markdown:', error);
+                return String(content);
+            }
+        }
     </script>
 </head>
 <body class="bg-gray-100 min-h-screen p-8">
@@ -36,8 +100,8 @@
                       placeholder="Enter your text passage here..."></textarea>
             <div class="flex items-center space-x-4 mb-4">
                 <label for="cardCount" class="text-gray-700">Number of cards:</label>
-                <input type="range" id="cardCount" min="1" max="10" value="3" class="w-32">
-                <span id="cardCountDisplay" class="text-gray-700">3</span>
+                <input type="range" id="cardCount" min="1" max="10" value="1" class="w-32">
+                <span id="cardCountDisplay" class="text-gray-700">1</span>
             </div>
             <div class="flex items-center space-x-4">
                 <button id="generateButton" onclick="generateCards()" 
@@ -315,32 +379,30 @@
                 try {
                     // Render front preview
                     const frontPreview = document.getElementById(`cardFrontPreview-${index}`);
-                    const frontHtml = marked.parse(card.front || '');
+                    const frontHtml = parseMarkdown(card.front);
                     frontPreview.innerHTML = frontHtml;
                     renderMathInElement(frontPreview, {
                         delimiters: [
                             {left: "$$", right: "$$", display: true},
-                            {left: "$", right: "$", display: false},
-                            {left: "\\[", right: "\\]", display: true},
-                            {left: "\\(", right: "\\)", display: false}
+                            {left: "$", right: "$", display: false}
                         ],
                         throwOnError: false,
-                        output: 'html'
+                        output: 'html',
+                        trust: true
                     });
 
                     // Render back preview
                     const backPreview = document.getElementById(`cardBackPreview-${index}`);
-                    const backHtml = marked.parse(card.back || '');
+                    const backHtml = parseMarkdown(card.back);
                     backPreview.innerHTML = backHtml;
                     renderMathInElement(backPreview, {
                         delimiters: [
                             {left: "$$", right: "$$", display: true},
-                            {left: "$", right: "$", display: false},
-                            {left: "\\[", right: "\\]", display: true},
-                            {left: "\\(", right: "\\)", display: false}
+                            {left: "$", right: "$", display: false}
                         ],
                         throwOnError: false,
-                        output: 'html'
+                        output: 'html',
+                        trust: true
                     });
                 } catch (error) {
                     console.error('Error rendering initial previews:', error);
@@ -467,7 +529,7 @@
                     }
                     
                     // Convert markdown to HTML using marked
-                    const html = marked.parse(content);
+                    const html = parseMarkdown(content);
                     console.log('Parsed HTML:', html);
                     
                     // Set the HTML content
@@ -478,12 +540,11 @@
                         renderMathInElement(previewElement, {
                             delimiters: [
                                 {left: "$$", right: "$$", display: true},
-                                {left: "$", right: "$", display: false},
-                                {left: "\\[", right: "\\]", display: true},
-                                {left: "\\(", right: "\\)", display: false}
+                                {left: "$", right: "$", display: false}
                             ],
                             throwOnError: false,
-                            output: 'html'
+                            output: 'html',
+                            trust: true
                         });
                         console.log('KaTeX rendering complete');
                     }
@@ -513,12 +574,11 @@
             renderMathInElement(document.body, {
                 delimiters: [
                     {left: "$$", right: "$$", display: true},
-                    {left: "$", right: "$", display: false},
-                    {left: "\\[", right: "\\]", display: true},
-                    {left: "\\(", right: "\\)", display: false}
+                    {left: "$", right: "$", display: false}
                 ],
                 throwOnError: false,
-                output: 'html'
+                output: 'html',
+                trust: true
             });
         });
 
