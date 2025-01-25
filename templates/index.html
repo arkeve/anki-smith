@@ -6,7 +6,25 @@
     <title>Anki Card Generator</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" rel="stylesheet">
+    <!-- Load libraries first -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+    
+    <script>
+        // Initialize marked.js options immediately after loading
+        window.onload = function() {
+            marked.setOptions({
+                breaks: true,
+                gfm: true,
+                headerIds: false,
+                mangle: false,
+                smartLists: true
+            });
+        };
+    </script>
 </head>
 <body class="bg-gray-100 min-h-screen p-8">
     <div class="max-w-3xl mx-auto">
@@ -216,14 +234,52 @@
                 cardElement.innerHTML = `
                     <div class="flex justify-between items-start mb-4">
                         <div class="flex-1">
-                            <h3 class="font-semibold text-lg mb-2">Front:</h3>
-                            <div contenteditable="true" 
-                                 class="text-gray-700 mb-4 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                 onblur="updateCardContent(${index}, 'front', this.textContent.trim())">${card.front}</div>
-                            <h3 class="font-semibold text-lg mb-2">Back:</h3>
-                            <div contenteditable="true" 
-                                 class="text-gray-700 mb-4 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
-                                 onblur="updateCardContent(${index}, 'back', this.textContent.trim())">${card.back}</div>
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="font-semibold text-lg">Front:</h3>
+                                <button onclick="toggleCardPreview(${index}, 'Front')" 
+                                        class="text-sm text-blue-500 hover:text-blue-700 flex items-center space-x-1">
+                                    <span class="preview-label-${index}-Front">Preview</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="relative">
+                                <div contenteditable="true" 
+                                     id="cardFrontRaw-${index}"
+                                     class="text-gray-700 mb-4 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                     onblur="updateCardContent(${index}, 'front', this.textContent.trim())"
+                                     oninput="handleContentChange(${index}, 'Front', this)">${card.front}</div>
+                                <div id="cardFrontPreview-${index}" 
+                                     class="hidden text-gray-700 mb-4 p-2 border rounded-lg prose max-w-none"></div>
+                            </div>
+                            
+                            <div class="flex justify-between items-center mb-2">
+                                <h3 class="font-semibold text-lg">Back:</h3>
+                                <button onclick="toggleCardPreview(${index}, 'Back')" 
+                                        class="text-sm text-blue-500 hover:text-blue-700 flex items-center space-x-1">
+                                    <span class="preview-label-${index}-Back">Preview</span>
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="relative">
+                                <div contenteditable="true" 
+                                     id="cardBackRaw-${index}"
+                                     class="text-gray-700 mb-4 p-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                                     onblur="updateCardContent(${index}, 'back', this.textContent.trim())"
+                                     oninput="handleContentChange(${index}, 'Back', this)">${card.back}</div>
+                                <div id="cardBackPreview-${index}" 
+                                     class="hidden text-gray-700 mb-4 p-2 border rounded-lg prose max-w-none"></div>
+                            </div>
+                            
                             <div class="tags-section">
                                 <h3 class="font-semibold text-lg mb-2">Tags:</h3>
                                 <select id="tagSelect${index}" multiple placeholder="Select or create tags..."></select>
@@ -271,7 +327,9 @@
 
         function updateCardContent(cardIndex, field, content) {
             if (generatedCards[cardIndex]) {
-                generatedCards[cardIndex][field] = content;
+                const fieldLower = field.toLowerCase();
+                generatedCards[cardIndex][fieldLower] = content;
+                console.log('Updated card content:', { cardIndex, field: fieldLower, content });
             }
         }
 
@@ -322,6 +380,113 @@
                 setLoading('saveButton', 'saveSpinner', false);
             }
         }
+
+        function toggleCardPreview(cardIndex, field) {
+            console.log('Toggle preview called for card', cardIndex, 'field', field);
+            
+            const rawElement = document.getElementById(`card${field}Raw-${cardIndex}`);
+            const previewElement = document.getElementById(`card${field}Preview-${cardIndex}`);
+            const labelElement = document.querySelector(`.preview-label-${cardIndex}-${field}`);
+            
+            console.log('Elements found:', {
+                raw: rawElement,
+                preview: previewElement,
+                label: labelElement
+            });
+            
+            if (!rawElement || !previewElement || !labelElement) {
+                console.error('Required elements not found');
+                return;
+            }
+            
+            const isShowingPreview = rawElement.classList.contains('hidden');
+            const fieldLower = field.toLowerCase();
+            
+            console.log('Current state:', {
+                isShowingPreview,
+                fieldLower,
+                content: generatedCards[cardIndex]?.[fieldLower]
+            });
+            
+            if (isShowingPreview) {
+                // Switch to raw mode
+                rawElement.classList.remove('hidden');
+                previewElement.classList.add('hidden');
+                labelElement.textContent = 'Preview';
+                console.log('Switched to raw mode');
+            } else {
+                // Switch to preview mode
+                rawElement.classList.add('hidden');
+                previewElement.classList.remove('hidden');
+                labelElement.textContent = 'Edit';
+                
+                // Render the preview
+                const content = generatedCards[cardIndex]?.[fieldLower] || '';
+                console.log('Rendering content:', content);
+                
+                try {
+                    if (typeof marked === 'undefined') {
+                        throw new Error('Markdown library not loaded');
+                    }
+                    
+                    // Convert markdown to HTML using marked
+                    const html = marked.parse(content);
+                    console.log('Parsed HTML:', html);
+                    
+                    // Set the HTML content
+                    previewElement.innerHTML = html;
+                    
+                    // Render KaTeX if available
+                    if (typeof renderMathInElement === 'function') {
+                        renderMathInElement(previewElement, {
+                            delimiters: [
+                                {left: "$$", right: "$$", display: true},
+                                {left: "$", right: "$", display: false},
+                                {left: "\\[", right: "\\]", display: true},
+                                {left: "\\(", right: "\\)", display: false}
+                            ],
+                            throwOnError: false,
+                            output: 'html'
+                        });
+                        console.log('KaTeX rendering complete');
+                    }
+                } catch (error) {
+                    console.error('Error rendering preview:', error);
+                    previewElement.innerHTML = `<span class="text-red-500">Error rendering preview: ${error.message}</span>`;
+                }
+            }
+        }
+
+        function handleContentChange(cardIndex, field, element) {
+            const content = element.textContent.trim();
+            const fieldLower = field.toLowerCase();
+            console.log('Content changed:', { cardIndex, field: fieldLower, content });
+            
+            updateCardContent(cardIndex, fieldLower, content);
+            
+            // If preview is currently shown, update it
+            const previewElement = document.getElementById(`card${field}Preview-${cardIndex}`);
+            if (previewElement && !previewElement.classList.contains('hidden')) {
+                toggleCardPreview(cardIndex, field);
+            }
+        }
+
+        // Initialize KaTeX auto-render
+        document.addEventListener('DOMContentLoaded', function() {
+            renderMathInElement(document.body, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false},
+                    {left: "\\[", right: "\\]", display: true},
+                    {left: "\\(", right: "\\)", display: false}
+                ],
+                throwOnError: false,
+                output: 'html'
+            });
+        });
+
+        // Add debug logging for preview clicks
+        window.toggleCardPreview = toggleCardPreview;
     </script>
 </body>
 </html> 
